@@ -1,0 +1,872 @@
+\documentclass{beamer}
+
+\mode<presentation>
+{
+  \usetheme{CambridgeUS}
+
+  \setbeamercovered{transparent}
+  % or whatever (possibly just delete it)
+}
+
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{minted}
+\newminted{py}{gobble=4,mathescape,texcl}
+
+\newcommand{\lra}{\ensuremath{\longrightarrow}}
+
+\title{Advanced Python Constructs}
+\subtitle{Generators, decorators and context managers}
+
+\author{Zbigniew Jędrzejewski-Szmek}
+
+\date{EuroSciPy, 2011}
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command: 
+
+%\beamerdefaultoverlayspecification{<+->}
+
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Outline}
+  \tableofcontents
+  % You might wish to add the option [pausesections]
+\end{frame}
+
+\section{Iterators}
+
+\begin{frame}[fragile]{Collections and their iterators}
+  \begin{itemize}
+    \item
+      \begin{semiverbatim}
+        \fbox{sequence}\pause.__iter__  \lra \fbox{iterator}\hfill
+      \end{semiverbatim}
+      \pause
+    \item
+      \fbox{iterator}.next() \lra \fbox{item}
+      \pause
+    \item
+      \phantom{\fbox{iterator}}.next() \lra \fbox{item}
+      \pause
+    \item
+      \phantom{\fbox{iterator}}.next() \lra \fbox{item}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{How can we create an iterator?}
+
+  \begin{enumerate}
+    \item write a class with \verb|.iter| and \verb|.next|
+    \item use a generator expression
+    \item write a generator function
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]{1. Iterator class}
+  \begin{pycode}
+    import random
+
+    class randomaccess(object):
+        def __init__(self, list):
+            self.indices = range(len(list))
+            random.shuffle(self.indices)
+            self.list = list
+        def next(self):
+            return self.list[self.indices.pop()]
+  \end{pycode}
+\end{frame}
+
+\subsection{Generator expressions}
+
+\begin{frame}[fragile]{2. Generator expressions}
+  \begin{pycode}
+    # remove comments
+    [line for line in open('/etc/fstab')
+     if not line.startswith('#')]
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{2. Generator expressions for \texttt{dict} and \texttt{set}}
+  \begin{pycode}
+    even_squares =
+  \end{pycode}
+  \onslide<1>
+  \begin{pycode}
+      set(i**2 for i in range(0, 10, 2))
+  \end{pycode}
+  \onslide<2->
+
+  \begin{pycode}
+      {i**2 for i in range(0, 10, 2)}
+  \end{pycode}
+
+  \vskip3em
+  \onslide<3->
+
+  \begin{pycode}
+    hex_digits =
+  \end{pycode}
+  \onslide<3>
+  \begin{pycode}
+      dict((c,i) for func in (str.lower, str.upper)
+                 for i,c in enumerate('abcdef'))
+  \end{pycode}
+
+  \onslide<4>
+  \begin{pycode}
+      {c:i for func in (str.lower, str.upper)
+               for i,c in enumerate('abcdef')}
+  \end{pycode}
+\end{frame}
+
+\subsection{Generator functions}
+\begin{frame}[fragile]{3. Generator functions}
+  \begin{columns}[t]
+    \column{.4\textwidth}
+    \begin{minted}{pycon}
+>>> def gen():
+...   print '--start'
+...   yield 1
+...   print '--middle'
+...   yield 2
+...   print '--stop'
+    \end{minted}
+    \column{.55\textwidth}
+    \pause
+    \begin{minted}{pycon}
+>>> g = gen()
+>>> next(g)
+--start
+1
+>>> next(g)
+--middle
+2
+>>> next(g)
+--stop
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+StopIteration
+    \end{minted}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Sending information \textbf{to} the generator}
+  \begin{columns}[t]
+    \column{.4\textwidth}
+    \begin{minted}[gobble=6]{python}
+      def gen():
+        print '--start'
+        val = yield 1
+        print '--got', val
+        print '--middle'
+        val = yield 2
+        print '--got', val
+        print '--done'
+    \end{minted}
+    \column{.6\textwidth}
+    \pause
+    \begin{minted}{pycon}
+>>> g = gen()
+>>> g.next()
+--start
+1
+>>> g.send('boo')
+--got boo
+--middle
+2
+>>> g.send('foo')
+--got foo
+--done
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+StopIteration
+    \end{minted}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Grep}
+    \begin{minted}[gobble=6]{python}
+      def grep(pattern):
+          print 'Looking for', pattern
+          while True:
+              line = yield
+              if pattern in line:
+                  print line,
+    \end{minted}
+    \pause
+    \begin{minted}{pycon}
+>>> g = grep('python')
+>>> g.next()
+Looking for python
+>>> g.send("Yeah, but no, but yeah, but no")
+>>> g.send("A series of tubes")
+>>> g.send("python generators rock!")
+python generators rock!
+    \end{minted}
+\end{frame}
+
+\subsection{Coroutines}
+
+\begin{frame}{TBD}
+  from follow import follow
+
+    %% # Set up a processing pipe : tail -f | grep python
+    %% logfile  = open("access-log")
+    %% loglines = follow(logfile)
+    %% pylines  = grep("python",loglines)
+
+    %% # Pull results out of the processing pipeline
+    %% for line in pylines:
+    %%     print line,
+\end{frame}
+
+\section{Decorators}
+
+\subsection{Function decorators}
+\begin{frame}[fragile]{Decorator syntax}
+  \begin{columns}[t]
+    \column{.4\textwidth}
+    \only<2->
+
+    \begin{minted}[gobble=6]{python}
+      def deco(orig_f):
+          print('decorating:', orig_f)
+          return orig_f
+    \end{minted}
+
+    \vskip3em
+
+    \begin{minted}[gobble=6]{python}
+      @deco
+      def func():
+          print('in func')
+    \end{minted}
+    \column{.6\textwidth}
+
+    \only<3->
+    \vskip12em
+    \begin{minted}[gobble=6]{python}
+      def func():
+          print('in func')
+      func = deco(func)
+    \end{minted}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Set an attribute on the function object}
+  \begin{columns}[t]
+    \column{0.6\textwidth}
+    \begin{minted}[gobble=6]{python}
+      class author(object):
+          def __init__(self, name):
+              self.name = name
+          def __call__(self, func):
+              func.author = self.name
+              return func
+    \end{minted}
+    \pause
+    \vskip1em
+    \begin{minted}[gobble=6]{python}
+      def author(name):
+          def helper(func):
+              func.author = name
+              return func
+          return helper
+    \end{minted}
+    \column{0.4\textwidth}
+    \pause
+    \vskip7em
+    \begin{minted}{pycon}
+>>> @author('Joe')
+... def f(): pass
+>>> f.author
+'Joe'
+    \end{minted}
+  \end{columns}
+\end{frame}
+
+\subsection{Replacing decorators}
+
+\begin{frame}[fragile]{\textbf{Replace} a function}
+  \begin{minted}[gobble=4]{python}
+    class deprecated(object):
+        "Print a deprecation warning once"
+        def __init__(self):
+            pass
+        def __call__(self, func):
+            self.func = func
+            self.count = 0
+            return self.wrapper
+        def wrapper(self, *args, **kwargs):
+            self.count += 1
+            if self.count == 1:
+                print self.func.__name__, 'is deprecated'
+            return self.func(*args, **kwargs)
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{\textbf{Replace} a function}
+  \begin{minted}[gobble=4]{python}
+    def deprecated(func):
+        """Print a deprecation warning once"""
+        func.count = 0
+        def wrapper(*args, **kwargs):
+            func.count += 1
+            if func.count == 1:
+                print func.__name__, 'is deprecated'
+            return func(*args, **kwargs)
+        return wrapper
+  \end{minted}
+  \begin{minted}{pycon}
+>>> @deprecated
+... def f(): pass
+>>> f()
+f is deprecated
+>>> f()
+>>> f()
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Decorators can be stacked}
+  \begin{minted}[gobble=4]{python}
+    @author('Joe')
+    @deprecated
+    def func():
+        pass
+  \end{minted}
+  \vskip1em
+  \begin{minted}[gobble=4]{python}
+    # old style
+    def func(): pass
+    func = author('Joe')(deprecated(func))
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{The docstring problem}
+  Our beautiful replacement function lost
+  \begin{itemize}
+  \item the docstring
+  \item attributes
+  \item proper argument list
+  \end{itemize}
+
+  \pause
+  \vskip1em
+  \begin{minted}[gobble=4]{python}
+    update_wrapper(wrapper, wrapped)
+  \end{minted}
+  \pause
+  \begin{itemize}
+    \item \verb+__doc__+
+      \pause
+    \item \verb+__module__+ and \verb+__name__+
+      \pause
+    \item \verb+__dict__+
+    \item \verb+eval+ is required for the rest :(
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Replace a function, keep the docstring}
+  \begin{minted}[gobble=4]{python}
+    def deprecated(func):
+        """Print a deprecation warning once"""
+        func.count = 0
+        def wrapper(*args, **kwargs):
+            func.count += 1
+            if func.count == 1:
+                print func.__name__, 'is deprecated'
+            return func(*args, **kwargs)
+        return update_wrapper(wrapper, func)
+  \end{minted}
+\end{frame}
+
+\subsection{Class decorators}
+
+\begin{frame}[fragile]{Add autogenerated \texttt{\_\_init\_\_}}
+  \begin{minted}[gobble=4]{python}
+    from new import instancemethod
+
+    def autoinit(*allowed_args):
+      allowed_args = frozenset(allowed_args)
+
+      def decorate(cls):
+        def __init__(self, **kwargs):
+          "Set all keyword arguments as attributes"
+          bad = set(kwargs.keys()) - allowed_args
+          if bad:
+            raise TypeError('bad args: '+', '.join(bad))
+          self.__dict__.update(kwargs)
+        cls.__init__ = instancemethod(__init__, None, cls)
+        return cls
+      return decorate
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Add autogenerated \texttt{\_\_init\_\_}}
+  \begin{minted}{pycon}
+>>> @autoinit('foo')
+... class A(object):pass
+>>> a = A(foo=3)
+>>> a.foo
+3
+>>> A(foo=1, boo=2, goo=3)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "<stdin>", line 8, in __init__
+TypeError: bad args: goo, boo
+  \end{minted}
+\end{frame}
+
+\subsection{Examples}
+
+\begin{frame}[fragile]{Decorators in the stdlib}
+  \begin{columns}[t]
+    \column{0.6\textwidth}
+    \pause
+    \begin{pycode}
+    class A(object):
+       def method(self, *args):
+          return 1
+    \end{pycode}
+    \pause
+    \begin{pycode}
+       @classmethod
+       def cmethod(cls, *args):
+          return 2
+    \end{pycode}
+    \pause
+    \begin{pycode}
+       @staticmethod
+       def smethod(*args):
+          return 3
+    \end{pycode}
+    \pause
+    \begin{pycode}
+       @property
+       def notamethod(*args):
+          return 4
+    \end{pycode}
+
+    \column{0.4\textwidth}
+    \only<2->{%
+>{>}> a = A()\\
+>{>}> a.method()\\
+1\\
+}
+    \only<3->{%
+>{>}> a = A()\\
+>{>}> a.cmethod()\\
+2\\
+}
+    \only<4->{%
+>{>}> a = A()\\
+>{>}> a.smethod()\\
+3\\
+}
+    \only<5->{%
+>{>}> a = A()\\
+>{>}> a.notamethod\\
+4\\
+}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{The \texttt{property} decorator}
+  \begin{pycode}
+    class Rectangle(object):
+        def __init__(self, edge):
+            self.edge = edge
+
+        @property
+        def area(self):
+            """Computed area.
+            """
+            return self.edge**2
+  \end{pycode}
+  \vskip20em
+\end{frame}
+\begin{frame}[fragile]{The \texttt{property} decorator}
+  \begin{pycode}
+    class Rectangle(object):
+        def __init__(self, edge):
+            self.edge = edge
+
+        @property
+        def area(self):
+            """Computed area.
+            Setting this updates the edge length!
+            """
+            return self.edge**2
+
+        @area.setter
+        def area(self, area):
+            self.edge = area ** 0.5
+  \end{pycode}
+  \vskip20em
+\end{frame}
+
+\section{Context managers}
+
+\begin{frame}[fragile]{Using a context manager}
+  \begin{pycode}
+    with manager as var:
+        do_something(var)
+  \end{pycode}
+  \pause
+  \vskip1em
+  \begin{pycode}
+    var = manager.__enter__()
+    try:
+        do_something(var)
+    finally:
+        manager.__exit__(None, None, None)
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{Context manager: \texttt{closing}}
+  \begin{pycode}
+     class closing(object):
+         def __init__(self, obj):
+             self.obj = obj
+         def __enter__(self):
+             return self.obj
+         def __exit__(self, *args):
+             self.obj.close()
+  \end{pycode}
+  \pause
+  \begin{minted}{pycon}
+>>> with closing(open('/tmp/file', 'w')) as f:
+...   f.write('the contents\n')
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Locking files with \texttt{flock(2)}}
+  \begin{pycode}
+    def add_user(login, uid, gid, name, home,
+                 shell='/bin/bash'):
+        fields = (login, str(uid), str(gid),
+                  name, home, shell)
+        f = open(PASSWD_FILE, 'w')
+        fcntl.lockf(f.fileno(), fcntl.LOCK_EX)
+        try:
+            f.seek(0, io.SEEK_END)
+            f.write(':'.join(fields) + '\n')
+            f.flush()
+        finally:
+            fcntl.lockf(f.fileno(), fcntl.LOCK_UN)
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{Context manager: \texttt{flocked}}
+  \begin{pycode}
+     import fcntl, io
+
+     class flocked(object):
+         def __init__(self, file):
+             self.file = file
+         def __enter__(self):
+             fcntl.lockf(self.file.fileno(), fcntl.LOCK_EX)
+             return self.file
+         def __exit__(self, *args):
+             fcntl.lockf(self.file.fileno(), fcntl.LOCK_UN)
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{Locking files with \texttt{flocked}}
+  \begin{pycode}
+    PASSWD_FILE = '/tmp/passwd'
+    def add_user(login, uid, gid, name, home,
+                 shell='/bin/bash'):
+        fields = (login, str(uid), str(gid),
+                  name, home, shell)
+        with open(PASSWD_FILE, 'w') as f, flocked(f):
+            f.seek(0, io.SEEK_END)
+            f.write(':'.join(fields) + '\n')
+            f.flush()
+  \end{pycode}
+\end{frame}
+
+\newcommand{\pyver}[1]{\raisebox{0.3em}{\colorbox{yellow}{\tiny #1}}}
+
+\begin{frame}[fragile]{Context managers in the stdlib}
+  \pause
+  \begin{itemize}
+    \item all file-like objects
+      \begin{itemize}
+        \item \verb|file|
+        \item \verb|fileinput|, \verb|tempfile| \pyver{(3.2)}
+        \item \verb|bz2.BZ2File|, \verb|gzip.GzipFile|
+          \verb|tarfile.TarFile|, \verb|zipfile.ZipFile|
+        \item \verb|ftplib|, \verb|nntplib| \pyver{(3.2 or 3.3)}
+      \end{itemize}
+    \pause
+    \item locks
+      \begin{itemize}
+      \item \verb|multiprocessing.RLock|
+      \item \verb|multiprocessing.Semaphore|
+      \item \verb|memoryview| \pyver{(3.2 and 2.7)}
+      \end{itemize}
+    \pause
+    \item \verb|decimal.localcontext|
+    \pause
+    \item \verb|warnings.catch_warnings|
+    \pause
+    \item \verb|contextlib.closing|
+    \pause
+    \item parallel programming
+      \begin{itemize}
+      \item \verb|concurrent.futures.ThreadPoolExecutor| \pyver{(3.2)}
+      \item \verb|concurrent.futures.ProcessPoolExecutor| \pyver{(3.2)}
+      \pause
+      \item \verb|nogil| \pyver{(cython only)}
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Managing exceptions}
+  \begin{pycode}
+    class Manager(object):
+        ...
+        def __exit__(self, type, value, traceback):
+            swallow = True
+            return swallow
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{Unittesting thrown exceptions}
+  \begin{pycode}
+    def test_indexing():
+       try:
+          {}['foo']
+       except KeyError:
+          pass
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{Unittesting thrown exceptions}
+  \begin{pycode}
+    class assert_raises(object):
+        def __init__(self, type):
+            self.type = type
+        def __enter__(self):
+            pass
+        def __exit__(self, type, value, traceback):
+            if type is None:
+                raise AssertionError('exception expected')
+            if issubclass(type, self.type):
+                return True
+            raise AssertionError('wrong exception type')
+  \end{pycode}
+  \pause
+  \begin{pycode}
+    def test_indexing():
+        with assert_raises(KeyError):
+            {}['foo']
+  \end{pycode}
+\end{frame}
+
+\subsection{Generators as context managers}
+
+\begin{frame}[fragile]{Writing context managers as generators}
+  \begin{minted}[gobble=4]{python}
+    class manager(object):
+        def __init__(self, <arguments>):
+            ...
+        def __enter__(self):
+            <setup>
+            return <value>
+        def __exit__(self, *exc_info):
+            <cleanup>
+  \end{minted}
+  \pause
+  \begin{minted}[gobble=4]{python}
+    @contextlib.contextmanager
+    def some_generator(<arguments>):
+        <setup>
+        try:
+            yield <value>
+        finally:
+            <cleanup>
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{assert\_raises} as a function}
+  \begin{pycode}
+    @contextlib.contextmanager
+    def assert_raises(exc):
+        try:
+            yield
+        except exc:
+            pass
+        except Exception as value:
+            raise AssertionError('wrong exception type')
+        else:
+            raise AssertionError(exc.__name__+' expected')
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{Let's test \texttt{assert\_raises}}
+  \begin{minted}{pycon}
+>>> with assert_raises(KeyError):
+...   pass
+Traceback (most recent call last):
+...
+AssertionError: KeyError expected
+>>> with assert_raises(KeyError):
+...   {}['foo']
+...
+>>> with assert_raises(KeyError):
+...   1/0
+Traceback (most recent call last):
+...
+ZeroDivisionError: division by zero
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+...
+AssertionError: wrong exception type
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Let's test \texttt{assert\_raises}}
+  \begin{minted}{pycon}
+>>> @assert_raises(KeyError)
+... def f(exc):
+...   if exc:
+...     raise exc
+>>> f(None)
+Traceback (most recent call last):
+...
+AssertionError: KeyError expected
+  \end{minted}
+\end{frame}
+
+% documentation ommission: contextlib.contextmanager documentation is too short,
+% doesn't mention c.m. being a decorator too
+
+% Structuring a talk is a difficult task and the following structure
+% may not be suitable. Here are some rules that apply for this
+% solution: 
+
+% - Exactly two or three sections (other than the summary).
+% - At *most* three subsections per section.
+% - Talk about 30s to 2min per frame. So there should be between about
+%   15 and 30 frames, all told.
+
+% - A conference audience is likely to know very little of what you
+%   are going to talk about. So *simplify*!
+% - In a 20min talk, getting the main ideas across is hard
+%   enough. Leave out details, even if it means being less precise than
+%   you think necessary.
+% - If you omit details that are vital to the proof/implementation,
+%   just say so once. Everybody will be happy with that.
+
+\begin{frame}{Make Titles Informative. Use Uppercase Letters.}{Subtitles are optional.}
+  % - A title should summarize the slide in an understandable fashion
+  %   for anyone how does not follow everything on the slide itself.
+
+  \begin{itemize}
+  \item
+    Use \texttt{itemize} a lot.
+  \item
+    Use very short sentences or short phrases.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Make Titles Informative.}
+
+  You can create overlays\dots
+  \begin{itemize}
+  \item using the \texttt{pause} command:
+    \begin{itemize}
+    \item
+      First item.
+      \pause
+    \item    
+      Second item.
+    \end{itemize}
+  \item
+    using overlay specifications:
+    \begin{itemize}
+    \item<3->
+      First item.
+    \item<4->
+      Second item.
+    \end{itemize}
+  \item
+    using the general \texttt{uncover} command:
+    \begin{itemize}
+      \uncover<5->{\item
+        First item.}
+      \uncover<6->{\item
+        Second item.}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+
+\section*{Summary}
+
+\begin{frame}{Summary}
+
+  \begin{itemize}[<+->]
+  \item
+    \alert{Generators} make good iterators
+  \item
+    \alert{Decorators} make wrapping and altering\\functions and classes easy
+  \item
+    \alert{Context managers} outsource \texttt{except..finally} blocks
+  \end{itemize}
+\end{frame}
+
+
+% All of the following is optional and typically not needed. 
+\appendix
+\section<presentation>*{\appendixname}
+\subsection<presentation>*{For Further Reading}
+
+\begin{frame}[allowframebreaks]
+  \frametitle<presentation>{For Further Reading}
+    
+  \begin{thebibliography}{10}
+    
+  \beamertemplatebookbibitems
+  % Start with overview books.
+
+  \bibitem{Author1990}
+    A.~Author.
+    \newblock {\em Handbook of Everything}.
+    \newblock Some Press, 1990.
+ 
+    
+  \beamertemplatearticlebibitems
+  % Followed by interesting articles. Keep the list short. 
+
+  \bibitem{Someone2000}
+    S.~Someone.
+    \newblock On this and that.
+    \newblock {\em Journal of This and That}, 2(1):50--100,
+    2000.
+  \end{thebibliography}
+\end{frame}
+
+\end{document}
