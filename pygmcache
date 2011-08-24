@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+# "sh", "-c", "pygmentize -l py -f latex -F tokenmerge  -F gobble:n=4  -P texcomments  -P mathescape   -P \"verboptions= \" -o advanced_python.out.pyg advanced_python.pyg"
+
+[ -d .pygmcache ] || mkdir .pygmcache
+
+srcfile=advanced_python.pyg
+outfile=advanced_python.out.pyg
+
+hash=$((echo $var; cat "$srcfile")|md5sum|cut -d' ' -f1)
+filename=".pygmcache/$hash"
+if [ -e "$filename" ]; then
+   cp "$filename" "$outfile"
+else
+   pygmentize "$@"
+   ln "$outfile" "$filename"
+fi
