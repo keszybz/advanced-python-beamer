@@ -39,6 +39,7 @@
 
 %\beamerdefaultoverlayspecification{<+->}
 
+\newcommand{\pyver}[1]{\raisebox{0.3em}{\colorbox{yellow}{\tiny #1}}}
 
 \begin{document}
 
@@ -56,25 +57,30 @@
 \begin{frame}[fragile]{Collections and their iterators}
   \begin{itemize}
     \item
-      \begin{semiverbatim}
-        \fbox{sequence}\pause.__iter__  \lra \fbox{iterator}\hfill
-      \end{semiverbatim}
+      \fbox{sequence}\pause.\_\_iter\_\_() \pause \lra \fbox{iterator}
       \pause
     \item
       \fbox{iterator}.next() \lra \fbox{item}
       \pause
     \item
-      \phantom{\fbox{iterator}}.next() \lra \fbox{item}
+      \fbox{iterator}.next() \lra \fbox{item}
       \pause
     \item
-      \phantom{\fbox{iterator}}.next() \lra \fbox{item}
+      \fbox{iterator}.next() \lra \fbox{item}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Iterators can be non-destructive or destructive}
+  \begin{itemize}
+    \item \texttt{list}
+    \item \texttt{file}
   \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]{How can we create an iterator?}
 
-  \begin{enumerate}
-    \item write a class with \verb|.iter| and \verb|.next|
+  \begin{enumerate}[<+->]
+    \item write a class with \verb|.__iter__| and \verb|.next|
     \item use a generator expression
     \item write a generator function
   \end{enumerate}
@@ -98,10 +104,25 @@
 
 \begin{frame}[fragile]{2. Generator expressions}
   \begin{pycode}
-    # remove comments
-    [line for line in open('/etc/fstab')
-     if not line.startswith('#')]
+    # chomped lines
+    [line.rstrip() for line in open(some_file)]
   \end{pycode}
+  \pause
+
+  \vskip2em
+  \begin{pycode}
+    # remove comments
+    [line for line in open(some_file)
+          if not line.startswith('#')]
+  \end{pycode}
+
+  \vskip2em
+  \begin{minted}{pycon}
+>>> type([i for i in 'abc'])
+<type 'list'>
+>>> type( i for i in 'abc' )
+<type 'generator'>
+  \end{minted}
 \end{frame}
 
 \begin{frame}[fragile]{2. Generator expressions for \texttt{dict} and \texttt{set}}
@@ -115,7 +136,7 @@
   \onslide<2->
 
   \begin{pycode}
-      {i**2 for i in range(0, 10, 2)}
+      {i**2 for i in range(0, 10, 2)}   # \pyver{(2.7) and (3.1)}
   \end{pycode}
 
   \vskip3em
@@ -133,14 +154,14 @@
   \onslide<4>
   \begin{pycode}
       {c:i for func in (str.lower, str.upper)
-               for i,c in enumerate('abcdef')}
+           for i,c in enumerate('abcdef')}     # \pyver{(2.7) and (3.1)}
   \end{pycode}
 \end{frame}
 
 \subsection{Generator functions}
 \begin{frame}[fragile]{3. Generator functions}
   \begin{columns}[t]
-    \column{.4\textwidth}
+    \column{.5\textwidth}
     \begin{minted}{pycon}
 >>> def gen():
 ...   print '--start'
@@ -149,20 +170,35 @@
 ...   yield 2
 ...   print '--stop'
     \end{minted}
-    \column{.55\textwidth}
+    \column{.5\textwidth}
     \pause
     \begin{minted}{pycon}
 >>> g = gen()
->>> next(g)
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
+>>> g.next()
 --start
 1
->>> next(g)
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
+>>> g.next()
 --middle
 2
->>> next(g)
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
+>>> g.next()
 --stop
 Traceback (most recent call last):
-  File "<stdin>", line 1, in <module>
+  ...
 StopIteration
     \end{minted}
   \end{columns}
@@ -170,7 +206,7 @@ StopIteration
 
 \begin{frame}[fragile]{Sending information \textbf{to} the generator}
   \begin{columns}[t]
-    \column{.4\textwidth}
+    \column{.5\textwidth}
     \begin{minted}[gobble=6]{python}
       def gen():
         print '--start'
@@ -181,22 +217,38 @@ StopIteration
         print '--got', val
         print '--done'
     \end{minted}
-    \column{.6\textwidth}
+    \column{.5\textwidth}
     \pause
+
     \begin{minted}{pycon}
 >>> g = gen()
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
 >>> g.next()
 --start
 1
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
 >>> g.send('boo')
 --got boo
 --middle
 2
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
 >>> g.send('foo')
 --got foo
 --done
 Traceback (most recent call last):
-  File "<stdin>", line 1, in <module>
+  ...
 StopIteration
     \end{minted}
   \end{columns}
@@ -604,8 +656,6 @@ TypeError: bad args: goo, boo
   \end{pycode}
 \end{frame}
 
-\newcommand{\pyver}[1]{\raisebox{0.3em}{\colorbox{yellow}{\tiny #1}}}
-
 \begin{frame}[fragile]{Context managers in the stdlib}
   \pause
   \begin{itemize}
@@ -728,7 +778,7 @@ TypeError: bad args: goo, boo
 >>> with assert_raises(KeyError):
 ...   pass
 Traceback (most recent call last):
-...
+  ...
 AssertionError: KeyError expected
 >>> with assert_raises(KeyError):
 ...   {}['foo']
@@ -736,13 +786,13 @@ AssertionError: KeyError expected
 >>> with assert_raises(KeyError):
 ...   1/0
 Traceback (most recent call last):
-...
+  ...
 ZeroDivisionError: division by zero
 
 During handling of the above exception, another exception occurred:
 
 Traceback (most recent call last):
-...
+  ...
 AssertionError: wrong exception type
   \end{minted}
 \end{frame}
@@ -755,7 +805,7 @@ AssertionError: wrong exception type
 ...     raise exc
 >>> f(None)
 Traceback (most recent call last):
-...
+  ...
 AssertionError: KeyError expected
   \end{minted}
 \end{frame}
