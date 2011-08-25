@@ -14,10 +14,13 @@
 \usepackage{times}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{fancybox}
 \usepackage{minted}
 \newminted{py}{gobble=4,mathescape,texcl}
 
 \newcommand{\lra}{\ensuremath{\longrightarrow}}
+\newcommand{\lla}{\ensuremath{\longleftarrow}}
 
 \title{Advanced Python Constructs}
 \subtitle{Generators, decorators and context managers}
@@ -35,7 +38,7 @@
 
 
 % If you wish to uncover everything in a step-wise fashion, uncomment
-% the following command: 
+% the following command:
 
 %\beamerdefaultoverlayspecification{<+->}
 
@@ -53,6 +56,10 @@
 \end{frame}
 
 \section{Iterators}
+
+\begin{frame}{}
+  \center\Huge Iterators
+\end{frame}
 
 \begin{frame}[fragile]{Collections and their iterators}
   \begin{itemize}
@@ -115,6 +122,7 @@
     [line for line in open(some_file)
           if not line.startswith('#')]
   \end{pycode}
+  \pause
 
   \vskip2em
   \begin{minted}{pycon}
@@ -204,6 +212,95 @@ StopIteration
   \end{columns}
 \end{frame}
 
+\begin{frame}[fragile]{Python version of Unix 'tail -f'}
+  \vskip5em
+  \begin{pycode}
+    logfile = open('/var/log/messages')
+    for line in follow(logfile):
+        print line,
+  \end{pycode}
+
+  \vskip5em
+  \color{darkgray}{http://www.dabeaz.com/coroutines/}
+\end{frame}
+
+\begin{frame}[fragile]{Inotify}
+  \begin{minted}{pycon}
+>>> watcher = inotify.watcher.Watcher()
+>>> watcher.add('/tmp/file', inotify.IN_MODIFY)
+1
+>>> watcher.read()
+[Event(path='/tmp/file', wd=1, mask=IN_MODIFY)]
+  \end{minted}
+
+  \pause
+  \texttt{IN\_MODIFY}\\
+  \texttt{IN\_MOVE}\\
+  \texttt{IN\_CLOSE\_NOWRITE}\\
+  \texttt{IN\_CLOSE\_WRITE}\\
+  ...
+\end{frame}
+
+\begin{frame}[fragile]{Implementation of our 'tail -f'}
+\begin{minted}{python}
+import os
+# https://bitbucket.org/bos/python-inotify
+import inotify, inotify.watcher
+
+def follow(file):
+    watcher = inotify.watcher.Watcher()
+    watcher.add(file.name, inotify.IN_MODIFY)
+    file.seek(0, os.SEEK_END)
+    while True:
+        line = file.readline()
+        if not line:
+            watcher.read()
+            continue
+        yield line
+\end{minted}
+\end{frame}
+
+\begin{frame}{Generators as pipelines}
+  \mbox{\alert<6>{\texttt{for x in s:}}}%
+  \lla \ovalbox{\alert<5>{generator}}%
+  \lla \ovalbox{\alert<4>{generator}}%
+  \lla \ovalbox{\alert<3>{generator}}%
+  \lla \parbox{4.5em}{\alert<2>{input\\sequence}}
+\end{frame}
+
+\begin{frame}[fragile]{A pipeline example}
+  \begin{pycode}
+    def grep(pattern, source):
+        for line in source:
+            if pattern in line:
+                 yield line
+  \end{pycode}
+  \pause
+
+  \begin{pycode}
+    # our pipeline:
+    #     tail -f /var/log/messages | grep python
+    logfile = open('/var/log/messages')
+
+    lines = follow(logfile)
+    interesting = grep('python', lines)
+
+    for line in interesting:
+        print line,
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{Yield as an expression}
+  \begin{pycode}
+    def gen():
+        val = yield
+  \end{pycode}
+
+  \vskip5em
+  \pause
+  Value is send when \texttt{gen().send(val)} is used, not \texttt{gen().next()}
+\end{frame}
+
 \begin{frame}[fragile]{Sending information \textbf{to} the generator}
   \begin{columns}[t]
     \column{.5\textwidth}
@@ -255,77 +352,229 @@ StopIteration
 \end{frame}
 
 \begin{frame}[fragile]{Grep}
-    \begin{minted}[gobble=6]{python}
-      def grep(pattern):
-          print 'Looking for', pattern
-          while True:
-              line = yield
-              if pattern in line:
-                  print line,
-    \end{minted}
-    \pause
-    \begin{minted}{pycon}
+%  \thinspace\verb|# grep pattern file|\thinspace
+%  \pause
+
+  \begin{minted}[gobble=4]{python}
+    def grep(pattern):
+        print 'Looking for', pattern
+        while True:
+            line = yield
+            if pattern in line:
+                print line,
+  \end{minted}
+  \pause
+  \begin{minted}{pycon}
 >>> g = grep('python')
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
 >>> g.next()
 Looking for python
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
 >>> g.send("Yeah, but no, but yeah, but no")
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
 >>> g.send("A series of tubes")
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
 >>> g.send("python generators rock!")
 python generators rock!
-    \end{minted}
+  \end{minted}
 \end{frame}
 
 \subsection{Coroutines}
 
-\begin{frame}{TBD}
-  from follow import follow
+\begin{frame}{Coroutines}
+  Let's push the data in other direction!
+  \vskip4em
 
-    %% # Set up a processing pipe : tail -f | grep python
-    %% logfile  = open("access-log")
-    %% loglines = follow(logfile)
-    %% pylines  = grep("python",loglines)
+  \mbox{\alert<2>{\texttt{for x in s:}}}%
+  \lra \ovalbox{\alert<3>{coroutine}}%
+  \lra \ovalbox{\alert<4>{coroutine}}%
+  \lra \ovalbox{\alert<5>{coroutine}}%
+  \lra \ovalbox{\alert<6>{a sink}}
+  \vskip2em
+  \only<7->{or}
+  \vskip2em
+  \only<8>{%
+    \ovalbox{source}%
+    \lra \ovalbox{coroutine}%
+    \lra \ovalbox{coroutine}%
+    \lra \ovalbox{coroutine}%
+    \lra \ovalbox{a sink}}
+\end{frame}
 
-    %% # Pull results out of the processing pipeline
-    %% for line in pylines:
-    %%     print line,
+\begin{frame}[fragile]{\texttt{follow} as a coroutine source}
+\begin{semiverbatim}
+import os
+import inotify, inotify.watcher
+
+def follow(file\alert<2>{, target}):
+    watcher = inotify.watcher.Watcher()
+    watcher.add(file.name, inotify.IN_MODIFY)
+    file.seek(0, os.SEEK_END)
+    while True:
+        line = file.readline()
+        if not line:
+            watcher.read()
+            continue
+        \alert<2>{target.send(line)}
+\end{semiverbatim}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{grep} as a coroutine}
+  \begin{semiverbatim}
+    def grep(pattern\alert<2>{, target}):
+        print 'Looking for', pattern
+        while True:
+            \alert<2>{line = yield}
+            if pattern in line:
+                \alert<2>{target.send(line)}
+  \end{semiverbatim}
+\end{frame}
+
+\begin{frame}[fragile]{A sink: \texttt{printer}}
+  \begin{pycode}
+    def printer():
+        while True:
+            line = yield
+            print line,
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{A coroutine pipeline}
+  \begin{block}{our pipeline}
+    tail -f /var/log/messages | grep python
+  \end{block}
+  \vskip\baselineskip
+  \begin{pycode}
+    sink = printer()
+    next(sink)
+  \end{pycode}
+  \vskip-\baselineskip
+  \pause
+  \vskip0pt
+  \begin{pycode}
+
+    interesting = grep('python', sink)
+    next(interesting)
+  \end{pycode}
+  \vskip-\baselineskip
+  \pause
+  \vskip0pt
+  \begin{pycode}
+
+    logfile = open('/var/log/messages')
+    follow(logfile, interesting)
+  \end{pycode}
+
+  \pause
+  \vskip2em
+  \color{darkgray}{http://www.dabeaz.com/coroutines/}
+\end{frame}
+
+\begin{frame}[fragile]{Throwing exceptions \textbf{into} the generator}
+  \begin{minted}{pycon}
+>>> def f():
+...   yield
+>>> g = f()
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
+>>> g.next()
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
+>>> g.throw(IndexError)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "<stdin>", line 2, in f
+IndexError
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Destroying generators}
+  \texttt{.close()} is used to destroy resources tied up in the generator
+
+  \pause
+  \vskip1em
+  \begin{minted}{pycon}
+>>> def f():
+...   try:
+...     yield
+...   except GeneratorExit:
+...     print "bye!"
+>>> g = f()
+>>> g.next()
+>>> g.close()
+bye!
+  \end{minted}
 \end{frame}
 
 \section{Decorators}
 
+\begin{frame}{}
+  \center\Huge Decorators
+\end{frame}
+
 \subsection{Function decorators}
 \begin{frame}[fragile]{Decorator syntax}
   \begin{columns}[t]
-    \column{.4\textwidth}
-    \only<2->
-
-    \begin{minted}[gobble=6]{python}
-      def deco(orig_f):
-          print('decorating:', orig_f)
-          return orig_f
-    \end{minted}
-
-    \vskip3em
-
+    \column{.5\textwidth}
     \begin{minted}[gobble=6]{python}
       @deco
       def func():
-          print('in func')
+          print 'in func'
     \end{minted}
-    \column{.6\textwidth}
+    \column{.5\textwidth}
 
-    \only<3->
-    \vskip12em
+    \pause
     \begin{minted}[gobble=6]{python}
       def func():
-          print('in func')
+          print 'in func'
       func = deco(func)
     \end{minted}
   \end{columns}
+
+  \pause
+  \vskip5em
+    \begin{minted}[gobble=6]{python}
+      def deco(orig_f):
+          print 'decorating:', orig_f
+          return orig_f
+    \end{minted}
 \end{frame}
 
 \begin{frame}[fragile]{Set an attribute on the function object}
   \begin{columns}[t]
+    \column{0.4\textwidth}
+    \vskip7em
+    \begin{minted}{pycon}
+>>> @author('Joe')
+... def f():
+...   pass
+>>> f.author
+'Joe'
+    \end{minted}
     \column{0.6\textwidth}
+    \pause
     \begin{minted}[gobble=6]{python}
       class author(object):
           def __init__(self, name):
@@ -343,19 +592,10 @@ python generators rock!
               return func
           return helper
     \end{minted}
-    \column{0.4\textwidth}
-    \pause
-    \vskip7em
-    \begin{minted}{pycon}
->>> @author('Joe')
-... def f(): pass
->>> f.author
-'Joe'
-    \end{minted}
   \end{columns}
 \end{frame}
 
-\subsection{Replacing decorators}
+\subsection{Wrapping decorators}
 
 \begin{frame}[fragile]{\textbf{Replace} a function}
   \begin{minted}[gobble=4]{python}
@@ -387,6 +627,8 @@ python generators rock!
             return func(*args, **kwargs)
         return wrapper
   \end{minted}
+
+  \pause
   \begin{minted}{pycon}
 >>> @deprecated
 ... def f(): pass
@@ -432,12 +674,16 @@ f is deprecated
     \item \verb+__module__+ and \verb+__name__+
       \pause
     \item \verb+__dict__+
+      \pause
     \item \verb+eval+ is required for the rest :(
+    \item module \verb+decorator+ compiles functions dynamically
   \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]{Replace a function, keep the docstring}
   \begin{minted}[gobble=4]{python}
+    import functools
+
     def deprecated(func):
         """Print a deprecation warning once"""
         func.count = 0
@@ -446,18 +692,69 @@ f is deprecated
             if func.count == 1:
                 print func.__name__, 'is deprecated'
             return func(*args, **kwargs)
-        return update_wrapper(wrapper, func)
+        return functools.update_wrapper(wrapper, func)
   \end{minted}
+
+  \vskip1.5em
+  \only<2>{\color{red}{pickle!}}
 \end{frame}
 
 \subsection{Class decorators}
 
+\begin{frame}[fragile]{Decorators work for classes too}
+  \begin{pycode}
+    @deco
+    class A(object):
+        pass
+  \end{pycode}
+\end{frame}
+
 \begin{frame}[fragile]{Add autogenerated \texttt{\_\_init\_\_}}
-  \begin{minted}[gobble=4]{python}
+  \begin{minted}{pycon}
+>>> @autoinit('foo')
+... class A(object):
+...   pass
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
+>>> a = A(foo=3)
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
+>>> a.foo
+3
+    \end{minted}
+    \vskip-\baselineskip
+    \pause
+    \vskip0pt
+    \begin{minted}{pycon}
+>>> A(foo=1, boo=2, goo=3)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "<stdin>", line 8, in __init__
+TypeError: bad args: goo, boo
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Add autogenerated \texttt{\_\_init\_\_}}
+  \begin{pycode}
     from new import instancemethod
 
+  \end{pycode}
+  \pause
+  \vskip0pt
+  \begin{pycode}
     def autoinit(*allowed_args):
       allowed_args = frozenset(allowed_args)
+  \end{pycode}
+  \vskip-\baselineskip
+  \pause
+  \vskip0pt
+  \begin{pycode}
 
       def decorate(cls):
         def __init__(self, **kwargs):
@@ -466,25 +763,20 @@ f is deprecated
           if bad:
             raise TypeError('bad args: '+', '.join(bad))
           self.__dict__.update(kwargs)
+  \end{pycode}
+  \vskip-\baselineskip
+  \pause
+  \vskip0pt
+  \begin{pycode}
         cls.__init__ = instancemethod(__init__, None, cls)
         return cls
+  \end{pycode}
+  \vskip-\baselineskip
+  \pause
+  \vskip0pt
+  \begin{pycode}
       return decorate
-  \end{minted}
-\end{frame}
-
-\begin{frame}[fragile]{Add autogenerated \texttt{\_\_init\_\_}}
-  \begin{minted}{pycon}
->>> @autoinit('foo')
-... class A(object):pass
->>> a = A(foo=3)
->>> a.foo
-3
->>> A(foo=1, boo=2, goo=3)
-Traceback (most recent call last):
-  File "<stdin>", line 1, in <module>
-  File "<stdin>", line 8, in __init__
-TypeError: bad args: goo, boo
-  \end{minted}
+  \end{pycode}
 \end{frame}
 
 \subsection{Examples}
@@ -524,17 +816,18 @@ TypeError: bad args: goo, boo
 1\\
 }
     \only<3->{%
->{>}> a = A()\\
 >{>}> a.cmethod()\\
+2\\
+>{>}> A.cmethod()\\
 2\\
 }
     \only<4->{%
->{>}> a = A()\\
 >{>}> a.smethod()\\
+3\\
+>{>}> A.smethod()\\
 3\\
 }
     \only<5->{%
->{>}> a = A()\\
 >{>}> a.notamethod\\
 4\\
 }
@@ -574,8 +867,28 @@ TypeError: bad args: goo, boo
   \end{pycode}
   \vskip20em
 \end{frame}
+\begin{frame}[fragile]{The \texttt{property} triple: setter, getter, deleter}
+  \begin{itemize}[<+->]
+  \item attribute access \verb+a.edge+ calls \verb+area.getx+
+    \begin{itemize}[<+->]
+    \item set with \verb+@property+
+    \end{itemize}
+  \item attribute setting \verb+a.edge=3+ calls \verb+area.setx+
+    \begin{itemize}[<+->]
+    \item set with \verb+.setter+
+    \end{itemize}
+  \item attribute setting \verb+del a.edge+ calls \verb+area.delx+
+    \begin{itemize}[<+->]
+    \item set with \verb+.deleter+
+    \end{itemize}
+  \end{itemize}
+\end{frame}
 
 \section{Context managers}
+
+\begin{frame}{}
+  \center\Huge Context managers
+\end{frame}
 
 \begin{frame}[fragile]{Using a context manager}
   \begin{pycode}
@@ -610,8 +923,30 @@ TypeError: bad args: goo, boo
   \end{minted}
 \end{frame}
 
+\begin{frame}[fragile]{\texttt{file} is a context manager}
+  \begin{minted}{pycon}
+>>> help(file.__enter__)
+Help on method_descriptor:
+
+__enter__(...)
+    __enter__() -> self.
+>>> help(file.__exit__)
+Help on method_descriptor:
+
+__exit__(...)
+    __exit__(*excinfo) -> None.  Closes the file.
+  \end{minted}
+  \pause
+  \begin{minted}{pycon}
+>>> with open('/tmp/file', 'a') as f:
+...   f.write('the contents\n')
+  \end{minted}
+\end{frame}
+
 \begin{frame}[fragile]{Locking files with \texttt{flock(2)}}
   \begin{pycode}
+    PASSWD_FILE = '/etc/passwd'
+
     def add_user(login, uid, gid, name, home,
                  shell='/bin/bash'):
         fields = (login, str(uid), str(gid),
@@ -619,7 +954,7 @@ TypeError: bad args: goo, boo
         f = open(PASSWD_FILE, 'w')
         fcntl.lockf(f.fileno(), fcntl.LOCK_EX)
         try:
-            f.seek(0, io.SEEK_END)
+            f.seek(0, os.SEEK_END)
             f.write(':'.join(fields) + '\n')
             f.flush()
         finally:
@@ -629,22 +964,23 @@ TypeError: bad args: goo, boo
 
 \begin{frame}[fragile]{Context manager: \texttt{flocked}}
   \begin{pycode}
-     import fcntl, io
+    import fcntl
 
-     class flocked(object):
-         def __init__(self, file):
-             self.file = file
-         def __enter__(self):
-             fcntl.lockf(self.file.fileno(), fcntl.LOCK_EX)
-             return self.file
-         def __exit__(self, *args):
-             fcntl.lockf(self.file.fileno(), fcntl.LOCK_UN)
+    class flocked(object):
+      def __init__(self, file):
+         self.file = file
+      def __enter__(self):
+         fcntl.lockf(self.file.fileno(), fcntl.LOCK_EX)
+         return self.file
+      def __exit__(self, *args):
+         fcntl.lockf(self.file.fileno(), fcntl.LOCK_UN)
   \end{pycode}
 \end{frame}
 
 \begin{frame}[fragile]{Locking files with \texttt{flocked}}
   \begin{pycode}
-    PASSWD_FILE = '/tmp/passwd'
+    PASSWD_FILE = '/etc/passwd'
+
     def add_user(login, uid, gid, name, home,
                  shell='/bin/bash'):
         fields = (login, str(uid), str(gid),
@@ -672,8 +1008,9 @@ TypeError: bad args: goo, boo
       \begin{itemize}
       \item \verb|multiprocessing.RLock|
       \item \verb|multiprocessing.Semaphore|
-      \item \verb|memoryview| \pyver{(3.2 and 2.7)}
       \end{itemize}
+    \pause
+    \item \verb|memoryview| \pyver{(3.2 and 2.7)}
     \pause
     \item \verb|decimal.localcontext|
     \pause
@@ -736,18 +1073,7 @@ TypeError: bad args: goo, boo
 \subsection{Generators as context managers}
 
 \begin{frame}[fragile]{Writing context managers as generators}
-  \begin{minted}[gobble=4]{python}
-    class manager(object):
-        def __init__(self, <arguments>):
-            ...
-        def __enter__(self):
-            <setup>
-            return <value>
-        def __exit__(self, *exc_info):
-            <cleanup>
-  \end{minted}
-  \pause
-  \begin{minted}[gobble=4]{python}
+  \begin{pycode}
     @contextlib.contextmanager
     def some_generator(<arguments>):
         <setup>
@@ -755,7 +1081,18 @@ TypeError: bad args: goo, boo
             yield <value>
         finally:
             <cleanup>
-  \end{minted}
+  \end{pycode}
+  \pause
+  \begin{pycode}
+    class Manager(object):
+        def __init__(self, <arguments>):
+            ...
+        def __enter__(self):
+            <setup>
+            return <value>
+        def __exit__(self, *exc_info):
+            <cleanup>
+  \end{pycode}
 \end{frame}
 
 \begin{frame}[fragile]{\texttt{assert\_raises} as a function}
@@ -780,9 +1117,13 @@ TypeError: bad args: goo, boo
 Traceback (most recent call last):
   ...
 AssertionError: KeyError expected
+
 >>> with assert_raises(KeyError):
 ...   {}['foo']
-...
+  \end{minted}
+\end{frame}
+\begin{frame}[fragile]{Let's test \texttt{assert\_raises}}
+  \begin{minted}{pycon}
 >>> with assert_raises(KeyError):
 ...   1/0
 Traceback (most recent call last):
@@ -813,67 +1154,6 @@ AssertionError: KeyError expected
 % documentation ommission: contextlib.contextmanager documentation is too short,
 % doesn't mention c.m. being a decorator too
 
-% Structuring a talk is a difficult task and the following structure
-% may not be suitable. Here are some rules that apply for this
-% solution: 
-
-% - Exactly two or three sections (other than the summary).
-% - At *most* three subsections per section.
-% - Talk about 30s to 2min per frame. So there should be between about
-%   15 and 30 frames, all told.
-
-% - A conference audience is likely to know very little of what you
-%   are going to talk about. So *simplify*!
-% - In a 20min talk, getting the main ideas across is hard
-%   enough. Leave out details, even if it means being less precise than
-%   you think necessary.
-% - If you omit details that are vital to the proof/implementation,
-%   just say so once. Everybody will be happy with that.
-
-\begin{frame}{Make Titles Informative. Use Uppercase Letters.}{Subtitles are optional.}
-  % - A title should summarize the slide in an understandable fashion
-  %   for anyone how does not follow everything on the slide itself.
-
-  \begin{itemize}
-  \item
-    Use \texttt{itemize} a lot.
-  \item
-    Use very short sentences or short phrases.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{Make Titles Informative.}
-
-  You can create overlays\dots
-  \begin{itemize}
-  \item using the \texttt{pause} command:
-    \begin{itemize}
-    \item
-      First item.
-      \pause
-    \item    
-      Second item.
-    \end{itemize}
-  \item
-    using overlay specifications:
-    \begin{itemize}
-    \item<3->
-      First item.
-    \item<4->
-      Second item.
-    \end{itemize}
-  \item
-    using the general \texttt{uncover} command:
-    \begin{itemize}
-      \uncover<5->{\item
-        First item.}
-      \uncover<6->{\item
-        Second item.}
-    \end{itemize}
-  \end{itemize}
-\end{frame}
-
-
 \section*{Summary}
 
 \begin{frame}{Summary}
@@ -889,34 +1169,34 @@ AssertionError: KeyError expected
 \end{frame}
 
 
-% All of the following is optional and typically not needed. 
-\appendix
-\section<presentation>*{\appendixname}
-\subsection<presentation>*{For Further Reading}
+%% % All of the following is optional and typically not needed.
+%% \appendix
+%% \section<presentation>*{\appendixname}
+%% \subsection<presentation>*{For Further Reading}
 
-\begin{frame}[allowframebreaks]
-  \frametitle<presentation>{For Further Reading}
-    
-  \begin{thebibliography}{10}
-    
-  \beamertemplatebookbibitems
-  % Start with overview books.
+%% \begin{frame}[allowframebreaks]
+%%   \frametitle<presentation>{For Further Reading}
 
-  \bibitem{Author1990}
-    A.~Author.
-    \newblock {\em Handbook of Everything}.
-    \newblock Some Press, 1990.
- 
-    
-  \beamertemplatearticlebibitems
-  % Followed by interesting articles. Keep the list short. 
+%%   \begin{thebibliography}{10}
 
-  \bibitem{Someone2000}
-    S.~Someone.
-    \newblock On this and that.
-    \newblock {\em Journal of This and That}, 2(1):50--100,
-    2000.
-  \end{thebibliography}
-\end{frame}
+%%   \beamertemplatebookbibitems
+%%   % Start with overview books.
+
+%%   \bibitem{Author1990}
+%%     A.~Author.
+%%     \newblock {\em Handbook of Everything}.
+%%     \newblock Some Press, 1990.
+
+
+%%   \beamertemplatearticlebibitems
+%%   % Followed by interesting articles. Keep the list short.
+
+%%   \bibitem{Someone2000}
+%%     S.~Someone.
+%%     \newblock On this and that.
+%%     \newblock {\em Journal of This and That}, 2(1):50--100,
+%%     2000.
+%%   \end{thebibliography}
+%% \end{frame}
 
 \end{document}
