@@ -93,6 +93,8 @@
   \end{enumerate}
 \end{frame}
 
+\subsection{Iterator classes}
+
 \begin{frame}[fragile]{1. Iterator class}
   \begin{pycode}
     import random
@@ -535,6 +537,7 @@ bye!
 \end{frame}
 
 \subsection{Function decorators}
+
 \begin{frame}[fragile]{Decorator syntax}
   \begin{columns}[t]
     \column{.5\textwidth}
@@ -882,6 +885,113 @@ TypeError: bad args: goo, boo
     \item set with \verb+.deleter+
     \end{itemize}
   \end{itemize}
+\end{frame}
+
+\subsection{Overloading functions}
+
+\begin{frame}[fragile]{Annotations}
+  \begin{minted}{pycon}
+>>> def func(a: 'comment', b: str) -> 'something':
+...    pass
+  \end{minted}
+  \vskip-\baselineskip
+  \pause
+  \vskip0pt
+  \begin{minted}{pycon}
+>>> func.__annotations__
+{'a': 'comment',
+ 'b': <class 'str'>,
+ 'return': 'something}
+  \end{minted}
+  \pause
+  \begin{minted}{pycon}
+>>> import sys
+>>> sys.version
+'3.2 (r32:88445, Feb 20 2011, 19:50:20) \n[GCC 4.4.5]'
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Overloading functions}
+  \begin{pycode}
+    class A(object):
+        @overloaded
+        def __init__(self, number: int):
+            print('A.__init__ int', self, number)
+            self.number = number
+  \end{pycode}
+  \pause
+  \begin{pycode}
+        @__init__.overload
+        def __init__(self, string: str):
+            print('A.__init__ str', self, string)
+            self.__init__(int(string))
+  \end{pycode}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{overloaded} decorator}
+  \begin{minted}{python}
+def overloaded(primary):
+    funcs = [primary]
+  \end{minted}
+  \pause
+  \begin{minted}{python}
+    def wrapper(self, *args, **kwargs):
+        print('overloaded:wrapper', args, kwargs)
+        for candidate in funcs:
+          print('considering', candidate)
+          if _fits(args, candidate):
+            return candidate(self, *args, **kwargs)
+        raise ValueError('no fitting method')
+  \end{minted}
+  \pause
+  \begin{minted}{python}
+    def overload(func):
+        funcs.append(func)
+        return wrapper
+  \end{minted}
+  \pause
+  \begin{minted}{python}
+    wrapper.overload = overload
+    return functools.update_wrapper(wrapper, primary)
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{overloaded} decorator --- \texttt{\_fits}}
+  \begin{minted}{python}
+def _fits(args, func):
+    argnames = func.__code__.co_varnames[1:]
+    types = [func.__annotations__.get(name, object)
+             for name in argnames]
+    if len(args) != len(types):
+        return False
+    return all(isinstance(arg, type)
+               for arg,type in zip(args,types))
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Testing the overloaded functions}
+  \begin{minted}{pycon}
+>>> a = A(11)
+>>> a.number
+11
+  \end{minted}
+  \vskip-\baselineskip
+  \pause
+  \vskip0pt
+  \begin{minted}{pycon}
+>>> b = A('11')
+>>> b.number
+11
+  \end{minted}
+  \vskip-\baselineskip
+  \pause
+  \vskip0pt
+  \begin{minted}{pycon}
+>>> A(11.0)
+Traceback (most recent call last):
+  ...
+ValueError: no fitting method
+  \end{minted}
 \end{frame}
 
 \section{Context managers}
