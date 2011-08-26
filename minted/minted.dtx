@@ -850,10 +850,14 @@
 %
 %    \begin{macrocode}
 \newcommand\minted@pygmentize[2][\jobname.pyg]{
-  \def\minted@cmd{pygmentize -l #2 -f latex -F tokenmerge
+  \def\minted@oldcmd{pygmentize -l #2 -f latex -F tokenmerge
     \minted@opt{gobble} \minted@opt{texcl} \minted@opt{mathescape}
     \minted@opt{linenos} -P "verboptions=\minted@opt{extra}"
     -o \jobname.out.pyg #1}
+  \def\minted@hash{.pygmcache/`(echo '\minted@oldcmd'; cat #1)|md5sum|cut -d' ' -f1`}
+  \def\minted@cmd{mkdir -p .pygmcache &&
+    cp "\minted@hash" \jobname.out.pyg 2>/dev/null || %
+    \minted@oldcmd && cp \jobname.out.pyg \minted@hash}
   \immediate\write18{\minted@cmd}
   \ifthenelse{\equal{\minted@opt@bgcolor}{}}
    {}

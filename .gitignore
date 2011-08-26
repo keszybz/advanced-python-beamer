@@ -1,1 +1,4 @@
 advanced_python.*
+*.pyc
+missfont.log
+.pygmcache
