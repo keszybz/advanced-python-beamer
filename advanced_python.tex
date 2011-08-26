@@ -117,8 +117,12 @@
             self.indices = range(len(list))
             random.shuffle(self.indices)
             self.list = list
+
         def next(self):
             return self.list[self.indices.pop()]
+
+        def __iter__(self):
+            return self
   \end{pycode}
 \end{frame}
 
@@ -614,7 +618,7 @@ bye!
 \subsection{Wrapping decorators}
 
 \begin{frame}[fragile]{\textbf{Replace} a function}
-  \begin{minted}[gobble=4]{python}
+  \begin{pycode}
     class deprecated(object):
         "Print a deprecation warning once"
         def __init__(self):
@@ -628,7 +632,12 @@ bye!
             if self.count == 1:
                 print self.func.__name__, 'is deprecated'
             return self.func(*args, **kwargs)
-  \end{minted}
+  \end{pycode}
+  \pause
+  \begin{pycode}
+    @deprecated()
+    def f(): pass
+  \end{pycode}
 \end{frame}
 
 \begin{frame}[fragile]{\textbf{Replace} a function}
