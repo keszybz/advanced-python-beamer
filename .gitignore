@@ -2,3 +2,4 @@ advanced_python.*
 *.pyc
 missfont.log
 .pygmcache
+/version.txt
